@@ -1,10 +1,19 @@
 import sys
 import threading
+from types import TracebackType
 from .spinners import bar_counter_clockwise
 
 
 class Spinner(object):
-    def __init__(self, beep=False, disable=False, force=False, stream=sys.stdout, spinner=bar_counter_clockwise, delay=0.25):
+    def __init__(
+        self,
+        beep: bool = False,
+        disable: bool = False,
+        force: bool = False,
+        stream: bool = sys.stdout,
+        spinner: bool = bar_counter_clockwise,
+        delay: float = 0.25,
+    ):
         self.spinner = spinner
         self.disable = disable
         self.beep = beep
@@ -15,7 +24,7 @@ class Spinner(object):
         self.delay = delay
         self.tty_output = self.stream.isatty() or self.force
 
-    def start(self):
+    def start(self) -> None:
         if self.disable:
             return
         if self.tty_output:
@@ -23,12 +32,12 @@ class Spinner(object):
             self.spin_thread = threading.Thread(target=self.init_spin)
             self.spin_thread.start()
 
-    def stop(self):
+    def stop(self) -> None:
         if self.spin_thread:
             self.stop_running.set()
             self.spin_thread.join()
 
-    def init_spin(self):
+    def init_spin(self) -> None:
         while not self.stop_running.is_set():
             self.stream.write(next(self.spinner))
             self.stream.flush()
@@ -36,11 +45,16 @@ class Spinner(object):
             self.stream.write('\b')
             self.stream.flush()
 
-    def __enter__(self):
+    def __enter__(self) -> 'Spinner':
         self.start()
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(
+        self,
+        exc_type: type[BaseException],
+        exc_val: BaseException,
+        exc_tb: TracebackType
+    ) -> bool:
         if self.disable:
             return False
         self.stop()
@@ -53,7 +67,14 @@ class Spinner(object):
         return False
 
 
-def spinner(beep=False, disable=False, force=False, stream=sys.stdout, spinner=bar_counter_clockwise, delay=0.25):
+def spinner(
+    beep: bool = False,
+    disable: bool = False,
+    force: bool = False,
+    stream: bool = sys.stdout,
+    spinner: bool = bar_counter_clockwise,
+    delay: float = 0.25,
+):
     """This function creates a context manager that is used to display a
     spinner on stdout as long as the context has not exited.
 
