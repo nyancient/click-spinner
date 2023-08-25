@@ -33,9 +33,18 @@ class Spinner(object):
             self.spin_thread.start()
 
     def stop(self) -> None:
-        if self.spin_thread:
-            self.stop_running.set()
-            self.spin_thread.join()
+        if not self.spin_thread:
+            return
+
+        self.stop_running.set()
+        self.spin_thread.join()
+
+        if self.tty_output:
+            if self.beep:
+                self.stream.write('\7')
+                self.stream.flush()
+            self.stream.write(' \b')
+            self.stream.flush()
 
     def init_spin(self) -> None:
         while not self.stop_running.is_set():
@@ -55,15 +64,8 @@ class Spinner(object):
         exc_val: BaseException,
         exc_tb: TracebackType
     ) -> bool:
-        if self.disable:
-            return False
-        self.stop()
-        if self.tty_output:
-            if self.beep:
-                self.stream.write('\7')
-                self.stream.flush()
-            self.stream.write(' \b')
-            self.stream.flush()
+        if not self.disable:
+            self.stop()
         return False
 
 
