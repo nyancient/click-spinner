@@ -1,18 +1,18 @@
 import sys
 import threading
-import itertools
+from .spinners import bar_counter_clockwise
 
 
 class Spinner(object):
-    spinner_cycle = itertools.cycle(['-', '/', '|', '\\'])
-
-    def __init__(self, beep=False, disable=False, force=False, stream=sys.stdout):
+    def __init__(self, beep=False, disable=False, force=False, stream=sys.stdout, spinner=bar_counter_clockwise, delay=0.25):
+        self.spinner = spinner
         self.disable = disable
         self.beep = beep
         self.force = force
         self.stream = stream
         self.stop_running = None
         self.spin_thread = None
+        self.delay = delay
         self.tty_output = self.stream.isatty() or self.force
 
     def start(self):
@@ -30,9 +30,9 @@ class Spinner(object):
 
     def init_spin(self):
         while not self.stop_running.is_set():
-            self.stream.write(next(self.spinner_cycle))
+            self.stream.write(next(self.spinner))
             self.stream.flush()
-            self.stop_running.wait(0.25)
+            self.stop_running.wait(self.delay)
             self.stream.write('\b')
             self.stream.flush()
 
@@ -53,7 +53,7 @@ class Spinner(object):
         return False
 
 
-def spinner(beep=False, disable=False, force=False, stream=sys.stdout):
+def spinner(beep=False, disable=False, force=False, stream=sys.stdout, spinner=bar_counter_clockwise, delay=0.25):
     """This function creates a context manager that is used to display a
     spinner on stdout as long as the context has not exited.
 
@@ -70,6 +70,10 @@ def spinner(beep=False, disable=False, force=False, stream=sys.stdout):
         Force creation of spinner even when stdout is redirected.
     stream : IO
         Stream to write the spinner to.
+    spinner : cycle[str]
+        Spinner animation to display.
+    delay : float
+        Delay, in seconds, between spinner frames.
 
     Example
     -------
@@ -79,7 +83,7 @@ def spinner(beep=False, disable=False, force=False, stream=sys.stdout):
             do_something_else()
 
     """
-    return Spinner(beep, disable, force, stream)
+    return Spinner(beep, disable, force, stream, spinner, delay)
 
 
 from . import _version
