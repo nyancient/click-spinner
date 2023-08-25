@@ -80,7 +80,73 @@ def test_spinner_erase():
         with click_spinner.Spinner(stream=stdout_io):
             time.sleep(1)  # allow time for a few spins
         stdout_str = stdout_io.getvalue()
-        assert stdout_str[-3:] == '\b \b'
+        assert stdout_str[-2:] == ' \r'
+
+    runner = CliRunner()
+    result = runner.invoke(cli, [])
+    assert result.exception is None
+
+
+def test_spinner_erase_with_label():
+    @click.command()
+    def cli():
+        stdout_io = StringIO()
+        stdout_io.isatty = lambda: True
+        with click_spinner.Spinner(stream=stdout_io, label="hello"):
+            time.sleep(1)  # allow time for a few spins
+        stdout_str = stdout_io.getvalue()
+        assert stdout_str[-8:] == '       \r'
+
+    runner = CliRunner()
+    result = runner.invoke(cli, [])
+    assert result.exception is None
+
+
+def test_spinner_label_placement():
+    @click.command()
+    def cli():
+        stdout_io = StringIO()
+        stdout_io.isatty = lambda: True
+        with click_spinner.Spinner(
+            stream=stdout_io,
+            finished_spinner='x',
+            label="hello",
+            label_placement='left',
+            keep_label=True
+        ):
+            time.sleep(1)  # allow time for a few spins
+        stdout_str = stdout_io.getvalue()
+        assert stdout_str[-8:] == 'hello x\n'
+
+    runner = CliRunner()
+    result = runner.invoke(cli, [])
+    assert result.exception is None
+
+
+def test_spinner_keep_label():
+    @click.command()
+    def cli():
+        stdout_io = StringIO()
+        stdout_io.isatty = lambda: True
+        with click_spinner.Spinner(stream=stdout_io, label="hello", keep_label=True):
+            time.sleep(1)  # allow time for a few spins
+        stdout_str = stdout_io.getvalue()
+        assert stdout_str[-6:] == 'hello\n'
+
+    runner = CliRunner()
+    result = runner.invoke(cli, [])
+    assert result.exception is None
+
+
+def test_spinner_keep_label_with_spinner():
+    @click.command()
+    def cli():
+        stdout_io = StringIO()
+        stdout_io.isatty = lambda: True
+        with click_spinner.Spinner(stream=stdout_io, label="hello", keep_label=True, finished_spinner='x'):
+            time.sleep(1)  # allow time for a few spins
+        stdout_str = stdout_io.getvalue()
+        assert stdout_str[-8:] == 'x hello\n'
 
     runner = CliRunner()
     result = runner.invoke(cli, [])

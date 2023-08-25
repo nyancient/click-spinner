@@ -1,6 +1,9 @@
 import sys
 import threading
 from types import TracebackType
+from typing import Literal, Optional
+
+import click
 from .spinners import bar_counter_clockwise
 
 
@@ -13,6 +16,10 @@ class Spinner(object):
         stream: bool = sys.stdout,
         spinner: bool = bar_counter_clockwise,
         delay: float = 0.25,
+        label: Optional[str] = None,
+        label_placement: Literal['left', 'right'] = 'right',
+        keep_label: bool = False,
+        finished_spinner: Optional[str] = None,
     ):
         self.spinner = spinner
         self.disable = disable
@@ -22,36 +29,42 @@ class Spinner(object):
         self.stop_running = None
         self.spin_thread = None
         self.delay = delay
+        self.label = label
+        self.label_placement = label_placement
+        self.keep_label = keep_label
+        self.finished_spinner = finished_spinner
         self.tty_output = self.stream.isatty() or self.force
+        self.spinner_template = _spinner_template(self.label, self.label_placement)
 
     def start(self) -> None:
-        if self.disable:
-            return
-        if self.tty_output:
+        if self.tty_output and not self.disable:
             self.stop_running = threading.Event()
             self.spin_thread = threading.Thread(target=self.init_spin)
             self.spin_thread.start()
 
     def stop(self) -> None:
-        if not self.spin_thread:
-            return
+        if self.spin_thread:
+            self.stop_running.set()
+            self.spin_thread.join()
 
-        self.stop_running.set()
-        self.spin_thread.join()
-
-        if self.tty_output:
-            if self.beep:
-                self.stream.write('\7')
+            if self.tty_output:
+                if self.beep:
+                    self.stream.write('\7')
+                    self.stream.flush()
+                spaces = ' ' * (len(self.spinner_template) - 1)
+                self.stream.write(spaces + '\r')
                 self.stream.flush()
-            self.stream.write(' \b')
-            self.stream.flush()
+
+        if self.keep_label and self.label:
+            text = _end_label(self.finished_spinner, self.spinner_template, self.label)
+            click.echo(text, file=self.stream)
 
     def init_spin(self) -> None:
         while not self.stop_running.is_set():
-            self.stream.write(next(self.spinner))
+            click.echo(self.spinner_template % next(self.spinner), file=self.stream, nl=False)
             self.stream.flush()
             self.stop_running.wait(self.delay)
-            self.stream.write('\b')
+            self.stream.write('\r')
             self.stream.flush()
 
     def __enter__(self) -> 'Spinner':
@@ -76,6 +89,10 @@ def spinner(
     stream: bool = sys.stdout,
     spinner: bool = bar_counter_clockwise,
     delay: float = 0.25,
+    label: Optional[str] = None,
+    label_placement: Literal['left', 'right'] = 'right',
+    keep_label: bool = False,
+    finished_spinner: Optional[str] = None,
 ):
     """This function creates a context manager that is used to display a
     spinner on stdout as long as the context has not exited.
@@ -97,6 +114,15 @@ def spinner(
         Spinner animation to display.
     delay : float
         Delay, in seconds, between spinner frames.
+    label : Optional[str]
+        Label to display next to the spinner.
+    label_placement : Literal['left', 'right']
+        Whether to display the label to the left or right of the spinner.
+    keep_label : bool
+        When using a label, keep label around in output (even if redirected) once the spinner is finished.
+    finished_spinner : Optional[str]
+        When using a label and keep_label is True, replace the spinner character with this character in the
+        output that is kept around. Useful for replacing a finished spinner with '✓' or similar.
 
     Example
     -------
@@ -106,7 +132,23 @@ def spinner(
             do_something_else()
 
     """
-    return Spinner(beep, disable, force, stream, spinner, delay)
+    return Spinner(beep, disable, force, stream, spinner, delay, label, label_placement, keep_label, finished_spinner)
+
+
+def _spinner_template(label: Optional[str], label_placement: Literal['left', 'right']) -> str:
+    if not label:
+        return '%s'
+    if label_placement == 'left':
+        return f'{label} %s'
+    else:
+        return f'%s {label}'
+
+
+def _end_label(finished_spinner: Optional[str], spinner_template: str, label: str) -> None:
+    if finished_spinner:
+        return spinner_template % finished_spinner
+    else:
+        return label
 
 
 from . import _version
